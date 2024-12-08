@@ -17,12 +17,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Swal from "sweetalert2";
 import UserCrudServices from "../Services/UserCrudServices";
-import "./UserDetails.scss";
+import "./UserStoreDetails.scss";
 
 export default class UserDetails extends Component {
-  state = {
-    readRecordData: [],  // Initialize as an empty array or object
-  };
   constructor(props) {
     super(props);
     this.service = new UserCrudServices();
@@ -33,14 +30,15 @@ export default class UserDetails extends Component {
       Password: "",
       confirmPassword: "",
       DataRecord: [],
+      readRecordData: [], // Initialize as an empty array
       UpdateFlag: false,
-      openDialog: props.openDialogByDefault || false, // Open dialog by default for register route
+      openDialog: props.openDialogByDefault || false,
       showPassword: false,
       errors: { UserName: "", Email: "", Password: "", confirmPassword: "" },
       hasChanges: false,
+      isLoading: false, // Track loading state
     };
   }
-
 
   async componentDidMount() {
     try {
@@ -61,8 +59,6 @@ export default class UserDetails extends Component {
       this.setState({ isLoading: false });
     }
   }
-
-
 
   showSuccessAlert = (message) => {
     Swal.fire({
@@ -113,7 +109,6 @@ export default class UserDetails extends Component {
     }
   };
 
-
   validateField = (name, value) => {
     let error = "";
     if (name === "UserName") {
@@ -138,9 +133,25 @@ export default class UserDetails extends Component {
     return error;
   };
 
-  handleChange = (event) => {
+  validateUniqueEmail = async (email) => {
+    const { readRecordData, UserId, UpdateFlag } = this.state;
+    const isDuplicate = readRecordData.some(
+      (record) => record.email === email && (!UpdateFlag || record.id !== Number(UserId))
+    );
+    return isDuplicate ? "This email is already in use." : "";
+  };
+
+  handleChange = async (event) => {
     const { name, value } = event.target;
-    const error = this.validateField(name, value);
+    let error = this.validateField(name, value);
+
+    if (name === "Email") {
+      const uniqueError = await this.validateUniqueEmail(value);
+      if (uniqueError) {
+        error = uniqueError;
+      }
+    }
+
     this.setState((prevState) => ({
       [name]: value,
       errors: { ...prevState.errors, [name]: error },
@@ -165,14 +176,12 @@ export default class UserDetails extends Component {
       errors,
       hasChanges,
     } = this.state;
-  
-    // Prevent update if no changes were made
+
     if (UpdateFlag && !hasChanges) {
       this.showErrorAlert("No changes have been made.");
       return;
     }
-  
-    // Validate fields before submitting
+
     const newErrors = {
       UserName: this.validateField("UserName", UserName),
       Email: this.validateField("Email", Email),
@@ -180,32 +189,27 @@ export default class UserDetails extends Component {
       ...(UpdateFlag ? {} : { confirmPassword: this.validateField("confirmPassword", confirmPassword) }),
     };
     this.setState({ errors: newErrors });
-  
-    // If there are validation errors, stop submission
+
     if (Object.values(newErrors).some((error) => error)) return;
-  
-    // Construct data payload
+
     const data = {
       userName: UserName,
       email: Email,
       ...(UpdateFlag
-        ? { userId: Number(UserId) } // Update case: Send userId only
-        : { password: Password, confirmPassword }), // Create case: Include confirmPassword
+        ? { userId: Number(UserId) }
+        : { password: Password, confirmPassword }),
     };
-  
+
     console.log("Submitting data:", data);
-  
+
     try {
       if (!UpdateFlag) {
-        // Create new user
         await this.service.CreateUser(data);
         this.showSuccessAlert("User created successfully!");
       } else {
-        // Update existing user
         await this.service.UpdateUser(data);
         this.showSuccessAlert("User updated successfully!");
       }
-      // Refresh the user list
       this.ReadUser();
     } catch (error) {
       console.error("Error saving record:", error.response?.data || error.message);
@@ -213,8 +217,7 @@ export default class UserDetails extends Component {
         error.response?.data?.message || "Failed to save the user. Please try again."
       );
     }
-  
-    // Reset the form and state
+
     this.setState({
       UpdateFlag: false,
       UserName: "",
@@ -226,7 +229,6 @@ export default class UserDetails extends Component {
       hasChanges: false,
     });
   };
-  
 
   handleEdit = (data) => {
     this.setState({
@@ -276,8 +278,8 @@ export default class UserDetails extends Component {
       showPassword,
       errors,
       UpdateFlag,
-      readRecordData,  // Assuming this is the fetched data state
-      isLoading,  // New state to track if the data is still loading
+      readRecordData,
+      isLoading,
     } = this.state;
 
     const columns = [
@@ -312,6 +314,12 @@ export default class UserDetails extends Component {
 
     return (
       <div className="MainContainer">
+        {/* Header Section */}
+        <header className="header">
+          <h1>Milk Dairy Management System</h1>
+        </header>
+    
+        {/* Main Content */}
         <div className="SubContainer">
           <h1 style={{ textAlign: "center", margin: "5px 0" }}>User Details</h1>
           <div className="ActionBar">
@@ -344,7 +352,6 @@ export default class UserDetails extends Component {
                 error={!!errors.Email}
                 helperText={errors.Email}
               />
-
               {!UpdateFlag && (
                 <TextField
                   fullWidth
@@ -368,7 +375,6 @@ export default class UserDetails extends Component {
                   }}
                 />
               )}
-
               {!UpdateFlag && (
                 <TextField
                   fullWidth
@@ -383,7 +389,6 @@ export default class UserDetails extends Component {
                   helperText={errors.confirmPassword}
                 />
               )}
-
             </DialogContent>
             <DialogActions>
               <Button onClick={this.toggleDialog}>Cancel</Button>
@@ -392,24 +397,21 @@ export default class UserDetails extends Component {
               </Button>
             </DialogActions>
           </Dialog>
-
-          {/* Loading state */}
           {isLoading ? (
-            <div>Loading...</div>  // Display a loading message if the data is still being fetched
+            <div>Loading...</div>
           ) : (
             <Paper style={{ height: 400, width: "100%", marginTop: 10 }}>
-              <DataGrid
-                rows={readRecordData}
-                columns={columns}
-                pageSize={10}
-                checkboxSelection // Enable checkboxes for row selection
-              />
+              <DataGrid rows={readRecordData} columns={columns} pageSize={10} checkboxSelection />
             </Paper>
-
           )}
         </div>
+    
+        {/* Footer Section */}
+        <footer className="footer" >
+          <p>&copy; {new Date().getFullYear()} Milk Dairy Management System. All Rights Reserved.</p>
+        </footer>
       </div>
     );
+    
   }
-
 }

@@ -19,17 +19,11 @@ export default class LoginServices {
     }
   }
 
-  async Logout() {
-    console.log("Logging out - URL:", Configuration.Logout);
-    try {
-      const response = await Loginaxios.post(Configuration.Logout, {}, {
-        headers: { "Content-Type": "application/json" },
-      });
-      console.log("Logout service response:", response);
-      return response;
-    } catch (error) {
-      console.error("Logout Error:", error.response ? error.response.data : error.message);
-      throw error;
-    }
+  async ForgotPassword(data) {
+    return await Loginaxios.post(Configuration.ForgotPassword, data, {
+      headers: { "Content-Type": "application/json" },
+    });
   }
+
+  
 }
